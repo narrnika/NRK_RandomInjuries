@@ -1,0 +1,4 @@
+IGUI_EN = {
+	IGUI_PlayerText_Fire = "Fire!!!",
+	IGUI_PlayerText_Hole = "Hole in clothes!",
+}

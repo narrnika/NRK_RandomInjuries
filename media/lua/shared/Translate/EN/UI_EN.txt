@@ -1,0 +1,4 @@
+UI_EN = {
+	UI_optionscreen_FakeDamage_tt = "If enabled, the character will not take damage, but will talk about it.",
+	UI_optionscreen_BasicFailChance_tt = "The chance of receiving damage for a usual character with zero skill level.",
+}

@@ -1,0 +1,11 @@
+id=NRK_RandomInjuries
+name=NRK Random Injuries
+description= <LANG:RU> Случайные травмы при использовании инструмента. <LINE>
+description= <LANG:EN> Random injuries when using tools. <LINE>
+
+modversion=0.1
+pzversion=41
+tags=Harder,Realistic
+authors=Narrnika
+
+poster=nrk_randominjuries_logo.png
