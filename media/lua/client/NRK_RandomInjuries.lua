@@ -49,6 +49,7 @@ NRK_RandomInjuries.DamageTargets = { -- SUMM == 125% (-25% source hand)
 NRK_RandomInjuries.DamageTypes = { -- SUMM for tool == 100%
 	--TODO: попадение в рану стекла, огнестрел - ???
 	["Base.Hammer"] = {["Pain"] = 40, ["Scratched"] = 40, ["Cut"] = 15, ["Fracture"] = 5},
+	["Base.BallPeenHammer"] = {["Pain"] = 40, ["Scratched"] = 40, ["Cut"] = 15, ["Fracture"] = 5},
 	["Base.Saw"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
 	["Base.GardenSaw"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
 	["Base.Screwdriver"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},

@@ -25,6 +25,8 @@ function ISCraftAction:new(character, item, time, recipe, container, containers)
 			perk = Perks.FromString("Electricity")
 		elseif category == "Cooking" then
 			perk = Perks.FromString("Cooking")
+		elseif category == "Smithing" then
+			perk = Perks.FromString("Blacksmith")
 		end
 		
 		
