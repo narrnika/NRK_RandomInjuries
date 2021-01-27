@@ -1,4 +1,6 @@
 UI_EN = {
-	UI_optionscreen_FakeDamage_tt = "If enabled, the character will not take damage, but will talk about it.",
+	UI_optionscreen_FakeDamage_tt = "If enabled, the character will not take damage (but will «talk» about it).",
+	UI_optionscreen_WeaponPerk_tt = "If enabled, weapon skills will affect the likelihood of being damaged.",
+	UI_optionscreen_PerkByCategory_tt = "If enabled, the influencing skill will be determined by the recipe category (unless the skill is listed in the recipe itself).",
 	UI_optionscreen_BasicFailChance_tt = "The chance of receiving damage for a usual character with zero skill level.",
 }

@@ -2,7 +2,9 @@ NRK_RandomInjuries = {}
 
 NRK_RandomInjuries.Options = { 
 	FakeDamage = false,
-	BasicFailChance = 5, -- BasicFailChance*10 = %
+	WeaponPerk = true,
+	PerkByCategory = true,
+	BasicFailChance = 4, -- BasicFailChance*10 = %
 	MinFailChance = 1,
 	LuckyEffect = 5,
 }
@@ -12,6 +14,12 @@ if ModOptions and ModOptions.getInstance then
 	
 	local flag1 = settings:getData("FakeDamage")
 	flag1.tooltip = getText("UI_optionscreen_FakeDamage_tt")
+	
+	local flag2 = settings:getData("WeaponPerk")
+	flag2.tooltip = getText("UI_optionscreen_WeaponPerk_tt")
+	
+	local flag3 = settings:getData("PerkByCategory")
+	flag3.tooltip = getText("UI_optionscreen_PerkByCategory_tt")
 	
 	local drop1 = settings:getData("BasicFailChance")
 	drop1[1] = "10%"
@@ -47,14 +55,9 @@ NRK_RandomInjuries.DamageTargets = { -- SUMM == 125% (-25% source hand)
 }
 
 NRK_RandomInjuries.DamageTypes = { -- SUMM for tool == 100%
-	--TODO: попадение в рану стекла, огнестрел - ???
-	["Base.Hammer"] = {["Pain"] = 40, ["Scratched"] = 40, ["Cut"] = 15, ["Fracture"] = 5},
-	["Base.BallPeenHammer"] = {["Pain"] = 40, ["Scratched"] = 40, ["Cut"] = 15, ["Fracture"] = 5},
-	["Base.Saw"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
-	["Base.GardenSaw"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
-	["Base.Screwdriver"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
-	["Base.KitchenKnife"] = {["Scratched"] = 80, ["Cut"] = 15, ["DeepWound"] = 5},
-	["Base.BlowTorch"] = {["Burned"] = 40, ["Scratched"] = 40, ["Cut"] = 10, ["DeepWound"] = 5, ["Fire"] = 5},
+	["Blunt"] = {["Pain"] = 45, ["Scratched"] = 45, ["Cut"] = 9, ["Fracture"] = 1}, -- Base.Hammer
+	["Blade"] = {["Scratched"] = 90, ["Cut"] = 9, ["DeepWound"] = 1}, -- Base.Saw
+	["Torch"] = {["Burned"] = 49, ["Scratched"] = 46, ["Cut"] = 3, ["DeepWound"] = 1, ["Fire"] = 1}, -- Base.BlowTorch
 }
 
 local function NRK_RND(list, exception)
@@ -69,44 +72,99 @@ local function NRK_RND(list, exception)
 	end
 end
 
-function NRK_RandomInjuries:getFailChance(character, perk)
+function NRK_RandomInjuries:getFailChance(character, tool, perks)
 	--TODO: учесть состояние персонажа (усталость/опьянение/нервы...) - ?
-	--TODO: учесть черту "толстая/тонкая кожа" - ?
+	if type(tool) ~= "string" or tool == "" then
+		return 0
+	end
+	
 	local luckyLevel = 0 + (character:HasTrait("Lucky") and 1 or 0) + (character:HasTrait("Unlucky") and -1 or 0)
-	local perkLevel = perk and character:getPerkLevel(perk) or 4
 	local maxLevel = 10
+	local perkLevel = 0
+	if type(perks) ~= "table" or #perks == 0 then
+		perkLevel = 4
+	else
+		for _, perkName in ipairs(perks) do
+			perkLevel = perkLevel + character:getPerkLevel(Perks.FromString(perkName))
+		end
+		perkLevel = perkLevel/#perks
+	end
 	local options = self.Options
 	return options.MinFailChance + ((options.BasicFailChance*10 - options.MinFailChance - options.LuckyEffect*luckyLevel)/100)*(perkLevel-maxLevel)^2
 end
 
-function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
+function NRK_RandomInjuries:getToolParams(toolName)
+	if type(toolName) ~= "string" or toolName == "" then
+		return nil, nil
+	end
+	
+	if toolName == "Base.BlowTorch" or toolName == "BlowTorch" then
+		return "Torch", nil
+	end
+	
+	local tool = InventoryItemFactory.CreateItem(toolName)
+	if tool == nil then
+		return nil, nil
+	end
+	
+	local options = self.Options
+	local damageType, needPerk = nil, nil
+	if instanceof(tool, "HandWeapon") then
+		if tool:getCategories():contains("Axe") then
+			damageType = "Blade"
+			needPerk = "Axe"
+		elseif tool:getCategories():contains("Blunt") then
+			damageType = "Blunt"
+			needPerk = "Blunt"
+		elseif tool:getCategories():contains("SmallBlunt") then
+			damageType = "Blunt"
+			needPerk = "SmallBlunt"
+		elseif tool:getCategories():contains("LongBlade") then
+			damageType = "Blade"
+			needPerk = "LongBlade"
+		elseif tool:getCategories():contains("SmallBlade") then
+			damageType = "Blade"
+			needPerk = "SmallBlade"
+		elseif tool:getCategories():contains("Spear") then
+			damageType = "Blade"
+			needPerk = "Spear"
+		end
+	elseif tool:hasTag("Saw") then
+		damageType = "Blade"
+	end
+	
+	return damageType, needPerk
+end
+
+function NRK_RandomInjuries:tryDamage(character, damageType, damageSource)
+	--TODO: учесть черту "толстая/тонкая кожа" - ?
 	local options = self.Options
 	
-	local damageTarget = NRK_RND(self.DamageTargets, damageSource)
+	local damageTarget = NRK_RND(self.DamageTargets, damageSource or BodyPartType.Hand_R)
 	print("NRK_RandomInjuries, damageTarget = ", damageTarget)
 	
-	local damageType = NRK_RND(self.DamageTypes[damageTool])
-	if damageType == "Pain" then
+	local injurieType = NRK_RND(self.DamageTypes[damageType])
+	if injurieType == "Pain" then
 		local defense = character:getBodyPartClothingDefense(BodyPartType.ToIndex(damageTarget), true)
 		local damage = ZombRand(1, 100)
 		print("NRK_RandomInjuries, biteDefense = ", defense)
 		if damage > defense then
 			if options.FakeDamage then
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				local bodyPart = character:getBodyDamage():getBodyPart(damageTarget)
 				bodyPart:setAdditionalPain(bodyPart:getAdditionalPain() + 40)
 			end
 			print("NRK_RandomInjuries, received damage: Pain!")
 		end
-	elseif damageType == "Scratched" then
+	elseif injurieType == "Scratched" then
 		local defense = character:getBodyPartClothingDefense(BodyPartType.ToIndex(damageTarget), false)
 		local damage = ZombRand(1, 100)
 		print("NRK_RandomInjuries, scratchDefense = ", defense)
 		if damage > defense then
 			if options.FakeDamage then
 				character:Say(getText("IGUI_PlayerText_Hole"))
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				for i = 0, character:getWornItems():size() - 1 do
 					character:addHole(BloodBodyPartType.FromString(BodyPartType.ToString(damageTarget)))
@@ -123,14 +181,14 @@ function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
 			end
 			print("NRK_RandomInjuries, received damage: Clothing!")
 		end
-	elseif damageType == "Cut" then
+	elseif injurieType == "Cut" then
 		local defense = character:getBodyPartClothingDefense(BodyPartType.ToIndex(damageTarget), true)
 		local damage = ZombRand(1, 100)
 		print("NRK_RandomInjuries, biteDefense = ", defense)
 		if damage > defense then
 			if options.FakeDamage then
 				character:Say(getText("IGUI_PlayerText_Hole"))
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				for i = 0, character:getWornItems():size() - 1 do
 					character:addHole(BloodBodyPartType.FromString(BodyPartType.ToString(damageTarget)))
@@ -147,14 +205,14 @@ function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
 			end
 			print("NRK_RandomInjuries, received damage: Clothing!")
 		end
-	elseif damageType == "DeepWound" then
+	elseif injurieType == "DeepWound" then
 		local defense = character:getBodyPartClothingDefense(BodyPartType.ToIndex(damageTarget), true)
 		local damage = ZombRand(1, 100)
 		print("NRK_RandomInjuries, biteDefense = ", defense)
 		if damage > defense then
 			if options.FakeDamage then
 				character:Say(getText("IGUI_PlayerText_Hole"))
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				for i = 0, character:getWornItems():size() - 1 do
 					character:addHole(BloodBodyPartType.FromString(BodyPartType.ToString(damageTarget)))
@@ -171,20 +229,20 @@ function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
 			end
 			print("NRK_RandomInjuries, received damage: Clothing!")
 		end
-	elseif damageType == "Fracture" then
+	elseif injurieType == "Fracture" then
 		local defense = character:getBodyPartClothingDefense(BodyPartType.ToIndex(damageTarget), true)
 		local damage = ZombRand(1, 100)
 		print("NRK_RandomInjuries, biteDefense = ", defense)
 		if damage > defense then
 			if options.FakeDamage then
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				local bodyPart = character:getBodyDamage():getBodyPart(damageTarget)
 				bodyPart:setFractureTime(bodyPart:getFractureTime() + 21)
 			end
 			print("NRK_RandomInjuries, received damage: Fracture!")
 		end
-	elseif damageType == "Burned" then
+	elseif injurieType == "Burned" then
 		-- total insulation: min = 0, max ~ 7.5; set insulation=3 as 100% defense (100/3 = 33)
 		local defense = 33*character:getBodyDamage():getThermoregulator():getNodeForType(damageTarget):getInsulation()
 		local damage = ZombRand(1, 100)
@@ -192,7 +250,7 @@ function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
 		if damage > defense then
 			if options.FakeDamage then
 				character:Say(getText("IGUI_PlayerText_Hole"))
-				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. damageType) .. "!")
+				character:Say(BodyPartType.getDisplayName(damageTarget) .. " - " .. getText("IGUI_health_" .. injurieType) .. "!")
 			else
 				for i = 0, character:getWornItems():size() - 1 do
 					character:addHole(BloodBodyPartType.FromString(BodyPartType.ToString(damageTarget)))
@@ -209,7 +267,7 @@ function NRK_RandomInjuries:tryDamage(character, damageSource, damageTool)
 			end
 			print("NRK_RandomInjuries, received damage: Clothing!")
 		end
-	elseif damageType == "Fire" then
+	elseif injurieType == "Fire" then
 		--TODO: учесть влажность одежды?
 		if options.FakeDamage then
 			character:Say(getText("IGUI_PlayerText_Fire"))
