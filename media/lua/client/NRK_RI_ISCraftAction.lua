@@ -69,5 +69,7 @@ function ISCraftAction:perform()
 	if self.failChance ~= nil and ZombRandFloat(0, 100) < self.failChance then
 		print("NRK_RandomInjuries.ISCraftAction.Fail")
 		NRK_RandomInjuries:tryDamage(self.character, self.damageType)
+		-- TODO: перенести очистку очереди в tryDamage?
+		ISTimedActionQueue.clear(self.character)
 	end
 end
